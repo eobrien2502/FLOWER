@@ -27,7 +27,7 @@
 // low energy reconstruction
 int flower_with_bonsai(const char *detector, //sets the default nearest neighbour distances etc. Check DetectorEnumFromString inside WCSimFLOWER.cpp for allowed values
 		       const char *filename="../wcsim.root",
-		       const char *outfiletag="", //output file for input file.root will be in the format file_flower_bonsai<outfiletag>.root
+		       const char *outfiletag="", //output file for input file.root will be in the format file_recon<outfiletag>.root
 		       const int  verbose=1,
 		       const bool overwrite_nearest = false, //if true, will overwrite the cached nearest neighbours file
 		       const double override_dark_rate = -99 //if positive, will override the default dark rate (taken from WCSimRootOptions)
@@ -52,7 +52,7 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 	//Note: If you have multiple true particles, the output tree won't account for this.
 	// Currently it just saves the first true primary particle in the WCSimRootTrack TClonesArray
 	TString outfilename(filename);
-	outfilename.ReplaceAll(".root", TString::Format("_bonsai_flower%s.root", outfiletag));
+	outfilename.ReplaceAll(".root", TString::Format("_recon%s.root", outfiletag));
 	TFile *outfile = new TFile(outfilename, "RECREATE");
 	TTree * out_tree = new TTree("lowEreco", "FLOWER & BONSAI reconstruction (setup for events with 1 primary track & 1 trigger)");
 	//setup true variables
@@ -130,22 +130,28 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 	TStopwatch timer;
 	for (int ev=0; ev < tree->GetEntries(); ev++) {
 
-	  //reset tree variables
-	  true_pos.SetXYZ(-9999,-9999,-9999);
-	  true_dir.SetXYZ(-99,-99,-99);
-	  true_time = -9999;
-	  true_energy = -99;
-	  reco_pos.SetXYZ(-9999,-9999,-9999);
-	  reco_dir.SetXYZ(-99,-99,-99);
-	  reco_time = -9999;
-	  reco_energy = -99;
-	  reco_neff = -99;
-	  reco_neff2 = -99;
-	  nhits = -99;
-	  ndigits = -99;
-	  sumChargeQID = -99;
+
+		//reset tree variables
+		true_pos.SetXYZ(-9999,-9999,-9999);
+		true_dir.SetXYZ(-99,-99,-99);
+		true_time = -9999;
+		true_energy = -99;
+		reco_pos.SetXYZ(-9999,-9999,-9999);
+		reco_dir.SetXYZ(-99,-99,-99);
+		reco_time = -9999;
+		reco_energy = -99;
+		reco_neff = -99;
+		reco_neff2 = -99;
+		nhits = -99;
+		ndigits = -99;
+		sumChargeQID = -99;
+
+		std::cout << "===============================================" << std::endl;
 	  
-		if (verbose) std::cout << "event number: " << ev << std::endl;
+		if (verbose){
+			std::cout << "event number: " << ev << std::endl;
+		}
+
 
 		// Read the event from the tree into the WCSimRootEvent instance
 		tree->GetEntry(ev);
@@ -161,17 +167,29 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 		true_pos.SetXYZ(trigger->GetVtx(0), trigger->GetVtx(1), trigger->GetVtx(2));
 		true_time = trigger->GetHeader()->GetDate();
 
+		if (verbose){
+			std::cout << "The true position vertex is: (" << trigger->GetVtx(0) << ", " << trigger->GetVtx(1) << ", " << trigger->GetVtx(2) << ")" << std::endl;
+		}
+
 		//get true track information
 		const int ntracks = trigger->GetNtrack();
 		bool found_true_track = false;
+
 		for(int itrack = 0; itrack < ntracks; itrack++) {
-		  TObject *element = (trigger->GetTracks())->At(itrack);
-		  if(!element)
-		    continue;
+
+		  	TObject *element = (trigger->GetTracks())->At(itrack);
+		  	if(!element)
+		    	continue;
 		  WCSimRootTrack *wcsimroottrack = dynamic_cast<WCSimRootTrack*>(element);
 
+		  if(verbose){
+			std::cout << "track true initial energy: " << wcsimroottrack->GetE() << " MeV" << std::endl;
+			std::cout << "track true initial momentum: " << wcsimroottrack->GetP() << " MeV/c" << std::endl;
+			std::cout << "track true mass: " << wcsimroottrack->GetM() << " MeV/c^2" << std::endl;
+		  }
+
 		  if(verbose > 1){
-		    cout<<"Track: "<<itrack<<endl << "  ";
+			cout<<"Track: "<<itrack<<endl << "  ";
 		    int trackflag = wcsimroottrack->GetFlag();
 		    if(trackflag==-1) cout<<"Primary neutrino track"<<endl;
 		    else if(trackflag==-2) cout<<"Neutrino target nucleus track"<<endl;
@@ -215,9 +233,13 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 			trigger = event->GetTrigger(index);
 			ncherenkovdigihits = trigger->GetNcherenkovdigihits();
 			sumChargeQID = trigger->GetSumQ();
-			if (verbose) std::cout << "ncherenkovdigihits: " << ncherenkovdigihits << std::endl;
+			if (verbose){
+				std::cout << "total charge for this event: " << sumChargeQID << std::endl;
+				std::cout << "ncherenkovdigihits: " << ncherenkovdigihits << std::endl;
+			}
 			if (ncherenkovdigihits == 0) {
 				std::cout << "t, PID, 0, 0, 0, 0" << std::endl;
+				// histograms and tree variables are not filled here if the event has no digi hits
 				continue;
 			}
 			std::vector<float> bsT (ncherenkovdigihits,0);
@@ -267,6 +289,10 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 			// Energy estimation for this trigger
 			eRec = flower->GetEnergy(bsT, bsCAB, &bsVertex[0]);
 
+			if (verbose){
+				std::cout << "Reconstructed energy: " << eRec << std::endl;
+			}
+
 			recEnergy->Fill(eRec);
 
 			// reconstructed lepton direction (bsResult[0] is theta, bsResult[1] is phi)
@@ -274,10 +300,15 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 			y = sin(bsResult[0]) * sin(bsResult[1]);
 			z = cos(bsResult[0]);
 
+			if(verbose){
+				std::cout << "Reconstructed direction: (" << x << ", " << y << ", " << z << ")" << std::endl;
+			}
+
 			// Print out reconstruction results in the format `time, PID, energy, direction (xyz), vertex (xyz)`
 			// PID (i.e. electron vs. positron) and absolute time (as opposed to time relative to the trigger window) are not available.
 			std::cout << "t, PID, " << eRec << ", " << x << ", " << y << ", " << z << ", " << bsVertex[0] << ", " << bsVertex[1] << ", " << bsVertex[2] << std::endl;
 
+			std::cout << "========================================================================"<< std::endl;
 			//fill the reconstructed tree variables
 			reco_pos.SetXYZ(bsVertex[0], bsVertex[1], bsVertex[2]);
 			reco_dir.SetXYZ(x, y, z);
