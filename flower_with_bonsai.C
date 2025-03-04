@@ -75,8 +75,10 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 	out_tree->Branch("reco_neff2", &reco_neff2, "reco_neff2/F");
 	//setup hit variables
 	int nhits, ndigits;
+	float sumChargeQID;
 	out_tree->Branch("nhits", &nhits, "nhits/I");
 	out_tree->Branch("ndigits", &ndigits, "ndigits/I");
+	out_tree->Branch("sumChargeQID", &sumChargeQID, "sumChargeQID/F");
 
 	// Read geometry from WCSim file
 	TTree *geotree = (TTree*)file->Get("wcsimGeoT");
@@ -111,7 +113,7 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 	//Read event tree from WCSim file
 	TTree *tree = (TTree*)file->Get("wcsimT"); // Get a pointer to the tree from the file
 	WCSimRootEvent* event = new WCSimRootEvent(); // Create WCSimRootEvent to put stuff from the tree in
-	tree->SetBranchAddress("wcsimrootevent", &event); // Set branch address for reading from tree
+	tree->SetBranchAddress("wcsimrootevent", &event); // Set branch address for reading from tree // here we see it's just looking at the ID triggers 
 	tree->GetBranch("wcsimrootevent")->SetAutoDelete(kTRUE); // Force deletion to prevent memory leak
 	WCSimRootTrigger* trigger; // will contain triggers of event later (0: initial particle; 1..n: decay products)
 
@@ -141,6 +143,7 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 	  reco_neff2 = -99;
 	  nhits = -99;
 	  ndigits = -99;
+	  sumChargeQID = -99;
 	  
 		if (verbose) std::cout << "event number: " << ev << std::endl;
 
@@ -207,10 +210,11 @@ int flower_with_bonsai(const char *detector, //sets the default nearest neighbou
 		if(!found_true_track)
 		  cerr << "Couldn't find the true track! True energy & true direction in the output tree are set to default values" << endl;
 
-		// Loop over triggers in the event
-		for (int index = 0 ; index < event->GetNumberOfEvents(); index++) {
+		// Loop over triggers in the event - changed to only get trigger 0
+		for (int index = 0 ; index < 1; index++) {
 			trigger = event->GetTrigger(index);
 			ncherenkovdigihits = trigger->GetNcherenkovdigihits();
+			sumChargeQID = trigger->GetSumQ();
 			if (verbose) std::cout << "ncherenkovdigihits: " << ncherenkovdigihits << std::endl;
 			if (ncherenkovdigihits == 0) {
 				std::cout << "t, PID, 0, 0, 0, 0" << std::endl;
