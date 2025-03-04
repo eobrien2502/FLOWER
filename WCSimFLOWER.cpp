@@ -467,6 +467,14 @@ void WCSimFLOWER::CorrectEnergy()
       fERec = 0.02524*fNEff - 2.081;
     break;
   case kHyperKRealistic:
+    if (fNEff < 701) {
+      // use fNEff, as normal
+      fERec = -0.000006202 * pow(fNEff, 2) + 0.02933 * fNEff - 0.5393;
+    } else {
+      // use fNEff2 (with occupancy to power of 1.4)
+      fERec = 0.0000002556 * pow(fNEff2, 2) + 0.02385 * fNEff2 + 0.1467;
+    }
+    break;
   case kHyperK20Old:
     if (fNEff<701)
       // use fNEff, as normal
